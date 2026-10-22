@@ -1,0 +1,90 @@
+project:
+  title: "Automatic Music Genre Classification Using Machine Learning and Deep Learning Techniques: A Comparative Study of Feature Selection and Dimensionality Reduction"
+  seed: 42
+  dataset_subset: medium
+  use_official_splits: true
+  class_order:
+    - Blues
+    - Classical
+    - Country
+    - Easy Listening
+    - Electronic
+    - Experimental
+    - Folk
+    - Hip-Hop
+    - Instrumental
+    - International
+    - Jazz
+    - Old-Time / Historic
+    - Pop
+    - Rock
+    - Soul-RnB
+    - Spoken
+
+paths:
+  audio_dir: fma_medium
+  metadata_dir: fma_metadata
+  tracks_csv: fma_metadata/tracks.csv
+  features_csv: data/features/fma_medium_features.csv
+  failures_csv: data/features/feature_failures.csv
+  feature_manifest: data/features/feature_manifest.json
+  models_dir: models
+  results_dir: results
+
+audio:
+  sample_rate: 22050
+  mono: true
+  duration_seconds: null # Preserve full track; inspect observed durations before any cropping.
+  n_fft: 2048
+  hop_length: 512
+  n_mfcc: 20
+  n_chroma: 12
+  roll_percent: 0.85
+
+features:
+  schema_version: 1
+  dtype: float32
+  checkpoint_every: 100
+  limit: null
+
+selection:
+  mutual_information_fractions: [0.25, 0.50, 0.75]
+  random_forest_counts: [20, 40, 60]
+  random_forest_trees: 300
+
+pca:
+  variance_thresholds: [0.95]
+
+models:
+  logistic_regression:
+    C: 1.0
+    max_iter: 1000
+  svm:
+    C: 1.0
+    gamma: scale
+  random_forest:
+    n_estimators: 300
+    max_depth: null
+    min_samples_leaf: 1
+  mlp:
+    hidden_layers: [256, 128]
+    dropout: 0.30
+    activation: relu
+    learning_rate: 0.001
+    weight_decay: 0.0001
+    batch_size: 128
+    max_epochs: 100
+    patience: 12
+  validation_search:
+    logistic_regression:
+      C: [0.1, 1.0, 10.0]
+    svm:
+      C: [1.0, 10.0]
+      gamma: [scale, 0.01]
+    random_forest:
+      n_estimators: [100, 300]
+      max_depth: [null, 20]
+    mlp:
+      hidden_layers: [[256, 128], [128, 64]]
+      learning_rate: [0.001, 0.0005]
+

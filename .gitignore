@@ -1,0 +1,34 @@
+# Raw dataset and generated artifacts
+fma_medium/
+fma_metadata/
+data/processed/*
+data/features/*
+models/*
+results/figures/*
+results/metrics/*
+results/predictions/*
+results/reports/*
+!data/processed/.gitkeep
+!data/features/.gitkeep
+!models/.gitkeep
+!results/figures/.gitkeep
+!results/metrics/.gitkeep
+!results/predictions/.gitkeep
+!results/reports/.gitkeep
+results/**/metrics/*
+results/**/audit/*
+results/**/predictions/*
+results/**/*checkpoint*
+results/**/*manifest*
+results/**/*hashes*
+
+# Python and editor artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+.venv/
+venv/
+*.log
+

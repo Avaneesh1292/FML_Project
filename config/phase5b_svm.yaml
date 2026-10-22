@@ -1,0 +1,13 @@
+version: 1
+description: "Isolated conventional full-training-set RBF SVC follow-up; does not alter Phase 5."
+base_config: config.yaml
+search:
+  C: [0.1, 1.0, 10.0]
+  gamma: ["scale", 0.001, 0.1]
+  kernel: rbf
+  class_weight: null
+  probability: false
+  decision_function_shape: ovr
+selection_metric: validation_macro_f1
+representations: [full, mutual_information, random_forest, pca_95]
+exploratory_test_evaluation: true
