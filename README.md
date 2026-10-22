@@ -1,51 +1,178 @@
 # FMA Medium Music Genre Classification
 
-This repository implements a controlled feature-based comparison of Logistic Regression, RBF SVM, Random Forest, and a PyTorch MLP using FMA Medium. The project preserves the synopsis objectives and common audio-feature workflow, changes the source dataset from GTZAN to FMA Medium, and adds training-only Mutual Information feature selection, Random Forest feature ranking, and PCA.
+This project implements a controlled, feature-based comparison of **Logistic Regression, RBF SVM, Random Forest, and a PyTorch MLP** using the FMA Medium music dataset. It follows the original project synopsis objectives and common audio-feature workflow, using FMA Medium instead of GTZAN. It also investigates Mutual Information feature selection, Random Forest feature ranking, and Principal Component Analysis (PCA).
 
-## Verified dataset scope
+## Dataset Scope
 
-`fma_metadata/tracks.csv` marks 17,000 IDs as `medium`; these map to 17,000 audio files. The audio folder also contains 8,000 `small` tracks. The pipeline filters using the metadata `subset == medium` field and never adds those small tracks. The official split counts are 13,522 training, 1,705 validation, and 1,773 test tracks. Split labels remain in every feature row. Missing audio is reported by the audit and excluded with a recorded reason during extraction.
+The project uses the official **FMA Medium subset**.
 
-## Environment
+- `fma_metadata/tracks.csv` identifies 17,000 tracks belonging to the `medium` subset.
+- These correspond to 17,000 medium-subset audio files. The audio directory also contains 8,000 tracks from the `small` subset, which are excluded.
+- The pipeline filters tracks using the metadata field `subset == medium`.
+- The official split contains 13,522 training tracks, 1,705 validation tracks, and 1,773 test tracks.
+- Split labels are preserved in feature records.
+- Missing or unreadable audio is reported during dataset auditing and excluded during extraction with a recorded reason.
 
-Use the existing Conda environment, not another interpreter:
+The raw dataset and metadata are not included in this repository. Obtain the dataset and place the files in the expected project directories before running the pipeline.
+
+## Project Structure
+
+```text
+FML_Project/
+├── config/          # Experiment configuration
+├── data/
+│   ├── processed/   # Processed data
+│   └── features/    # Extracted audio features
+├── models/          # Locally saved trained models
+├── notebooks/       # Exploration and experiments
+├── results/         # Locally generated results
+├── scripts/         # Dataset, training, and prediction scripts
+├── src/             # Core project implementation
+├── tests/           # Automated tests
+├── README.md
+├── .gitignore
+└── requirements-lock.txt
+```
+
+Generated datasets, feature caches, trained models, and experiment outputs are excluded from version control.
+
+## Environment Setup
+
+The project was developed using the existing Conda environment named `fml-music`.
+
+Activate the environment:
 
 ```powershell
 conda activate fml-music
+```
+
+Verify the Python interpreter and PyTorch setup:
+
+```powershell
 python -c "import sys, torch; print(sys.executable); print(torch.__version__, torch.cuda.is_available()); print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU')"
 ```
 
-If activation is unavailable, call the verified interpreter directly:
+Dependencies are documented in `requirements-lock.txt`. Use the project environment to avoid differences between Python interpreters. The feature cache uses CSV, so a Parquet engine is not required. The test suite uses Python's built-in `unittest` framework.
 
-```powershell
-$Python = 'C:\Users\Nalla Avaneesh Reddy\anaconda3\envs\fml-music\python.exe'
-& $Python -m unittest discover -s tests -v
-```
+## Running the Project
 
-Dependencies already present in the environment are listed in `requirements-lock.txt`. No Parquet engine is installed, so the restartable feature cache uses CSV. No third-party test runner is required.
+Run the commands from the repository root.
 
-## Commands
-
-From the repository root:
+### 1. Inspect the dataset
 
 ```powershell
 python scripts/inspect_dataset.py
-python scripts/extract_features.py
-python scripts/run_experiments.py
-python scripts/predict_genre.py path\to\song.mp3 --model models\phase5b_svm\phase5b_svm__mutual_information.joblib
 ```
 
-Extraction and experiments are intentionally separate. Extraction preserves the complete audio duration, converts to mono, resamples to 22,050 Hz, and writes per-track checkpoints and failures. Numba-backed librosa JIT cache files default to `data/processed/numba_cache` so the runtime does not need to write into the installed package directory. Before an approved full run, inspect durations and estimate runtime/disk use from a representative subset. Feature cache configuration/schema hashes prevent silent reuse after feature changes.
+This inspects the dataset and reports relevant metadata and audio-file information.
 
-The experiment script keeps the official partitions fixed. Model/transformer fitting uses training rows; MI/RF candidate counts are chosen by validation macro-F1; PCA standardization and PCA are fit on training only. The test partition is evaluated after model selection and is not used for ranking or tuning. The MLP uses mini-batches, validation-loss early stopping, dynamically selects CUDA when present, and supports CPU fallback.
+### 2. Extract audio features
 
-The MLP is a tabular neural network trained with Adam and cross-entropy, mini-batches, and validation early stopping. Logistic Regression, SVM, and Random Forest use scikit-learn estimators; SVM and Logistic Regression include train-fitted standardization. This uses different optimization procedures by model family while keeping data partitions and feature inputs controlled.
+```powershell
+python scripts/extract_features.py
+```
 
-## Feature schema
+Feature extraction and model experiments are separate stages. Extraction processes the complete available audio duration, converts audio to mono, resamples it to 22,050 Hz, and records per-track checkpoints and failures.
 
-Each track yields 74 predictors: mean and standard deviation of 20 MFCC coefficients, 12 chroma bins, and zero-crossing rate, spectral centroid, spectral bandwidth, spectral roll-off, and RMS. IDs, genre, and official split remain metadata columns, never predictors. Audio decode errors, too-short tracks, and non-finite values are surfaced and recorded.
+Numba-backed librosa JIT cache files default to `data/processed/numba_cache`. Feature-cache configuration and schema hashes help prevent accidental reuse after feature definitions change.
 
-## Outputs
+Before a full extraction run, inspect track durations and estimate runtime and disk requirements using a representative subset.
 
-Generated artifacts are git-ignored. Feature CSVs and failures go under `data/features/`; model bundles under `models/`; result metrics under `results/metrics/`. The full Phase 5 experiments are complete; see `results/reports/phase6_results_analysis.md` for the controlled comparison and `results/reports/phase5b_svm_followup.md` for the SVM follow-up. Phase 5B test results are exploratory because the Phase 5 test results had already been inspected; they are not unbiased final performance estimates.
+### 3. Run model experiments
 
+```powershell
+python scripts/run_experiments.py
+```
+
+The experiment pipeline compares the selected machine-learning models using the configured features and official data partitions.
+
+### 4. Predict a genre
+
+After training, use the path to an available saved model:
+
+```powershell
+python scripts/predict_genre.py path\to\song.mp3 --model path\to\trained_model.joblib
+```
+
+The model path is an example; use the actual model file generated by your experiment configuration.
+
+### 5. Run tests
+
+```powershell
+python -m unittest discover -s tests -v
+```
+
+Tests can also be run using the verified interpreter from the `fml-music` environment.
+
+## Audio Feature Extraction
+
+Each track produces **74 predictors**:
+
+- Mean and standard deviation of 20 MFCC coefficients: 40 features.
+- 12 chroma features.
+- Zero-crossing rate.
+- Spectral centroid.
+- Spectral bandwidth.
+- Spectral roll-off.
+- RMS energy.
+
+Track IDs, genre labels, and official split assignments are retained as metadata and are not used as predictors.
+
+Audio decoding errors, tracks that are too short, and non-finite feature values are surfaced and recorded during processing.
+
+## Feature Selection and Dimensionality Reduction
+
+The project investigates:
+
+- **Mutual Information (MI):** Selects candidate features based on their relationship with the target labels.
+- **Random Forest feature ranking:** Ranks features using a tree-based model.
+- **Principal Component Analysis (PCA):** Reduces dimensionality after standardization.
+
+Feature selection and dimensionality-reduction transformations are fitted using training data. Candidate counts are selected using validation macro-F1, rather than the test partition.
+
+## Models
+
+The project compares four model families:
+
+1. **Logistic Regression** — a linear classification baseline.
+2. **RBF Support Vector Machine (SVM)** — a nonlinear classifier using a radial basis function kernel.
+3. **Random Forest** — an ensemble of decision trees.
+4. **Multilayer Perceptron (MLP)** — a tabular neural network implemented in PyTorch.
+
+Logistic Regression and SVM use training-fitted standardization. The MLP uses mini-batches, the Adam optimizer, cross-entropy loss, and validation-loss-based early stopping. It uses CUDA when available and supports CPU execution.
+
+## Experimental Methodology
+
+The official training, validation, and test partitions are kept fixed.
+
+- Model and transformation fitting uses training data.
+- MI and Random Forest feature counts are selected using validation macro-F1.
+- Standardization and PCA are fitted on training data.
+- Validation data supports model selection and early stopping.
+- The test partition is evaluated after model selection and is not used for ranking or tuning.
+
+**Evaluation caveat:** Phase 5 test results had already been inspected before the Phase 5B SVM follow-up. Consequently, Phase 5B test results are exploratory and should not be interpreted as unbiased final performance estimates.
+
+## Outputs and Version Control
+
+Generated artifacts are stored locally and excluded from Git:
+
+- `data/features/` — extracted feature files.
+- `data/processed/` — processed data and caches.
+- `models/` — trained models.
+- `results/` — experiment metrics, figures, predictions, audits, and reports.
+
+The repository contains the code and configuration needed to reproduce the workflow, rather than the raw audio dataset or generated model files.
+
+## Reproducibility
+
+For reproducible experiments:
+
+1. Use the documented Python environment and dependencies.
+2. Obtain the correct FMA Medium dataset and metadata.
+3. Run dataset inspection before feature extraction.
+4. Extract features before starting model experiments.
+5. Preserve the official data partitions and configured experiment settings.
+6. Run the test suite to check the project implementation.
+
+Results may vary with environment differences, dependency versions, hardware, or changes to the configuration and input data.
