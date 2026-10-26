@@ -4,6 +4,9 @@ fma_metadata/
 data/processed/*
 data/features/*
 models/*
+!models/phase5b_svm/
+models/phase5b_svm/*
+!models/phase5b_svm/phase5b_svm__mutual_information.joblib
 results/figures/*
 results/metrics/*
 results/predictions/*

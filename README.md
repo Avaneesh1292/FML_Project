@@ -29,12 +29,13 @@ FML_Project/
 ├── scripts/         # Dataset, training, and prediction scripts
 ├── src/             # Core project implementation
 ├── tests/           # Automated tests
+├── website/         # Interactive Streamlit application
 ├── README.md
 ├── .gitignore
 └── requirements-lock.txt
 ```
 
-Generated datasets, feature caches, trained models, and experiment outputs are excluded from version control.
+Generated datasets, feature caches, trained models, and experiment outputs are generally excluded from version control. The specific inference model required by the web application is included in the repository.
 
 ## Environment Setup
 
@@ -52,9 +53,11 @@ Verify the Python interpreter and PyTorch setup:
 python -c "import sys, torch; print(sys.executable); print(torch.__version__, torch.cuda.is_available()); print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU')"
 ```
 
-Dependencies are documented in `requirements-lock.txt`. Use the project environment to avoid differences between Python interpreters. The feature cache uses CSV, so a Parquet engine is not required. The test suite uses Python's built-in `unittest` framework.
+Dependencies for the ML experiments are documented in `requirements-lock.txt`. The web application has a separate dependency file at `website/requirements.txt` to avoid installing training dependencies for deployment.
 
-## Running the Project
+The feature cache uses CSV, so a Parquet engine is not required. The test suite uses Python's built-in `unittest` framework.
+
+## Running the ML Project
 
 Run the commands from the repository root.
 
@@ -155,14 +158,77 @@ The official training, validation, and test partitions are kept fixed.
 
 ## Outputs and Version Control
 
-Generated artifacts are stored locally and excluded from Git:
+Generated artifacts are stored locally and excluded from Git, except for the specific model bundle needed by the web application.
 
 - `data/features/` — extracted feature files.
 - `data/processed/` — processed data and caches.
 - `models/` — trained models.
 - `results/` — experiment metrics, figures, predictions, audits, and reports.
 
-The repository contains the code and configuration needed to reproduce the workflow, rather than the raw audio dataset or generated model files.
+The repository contains the code and configuration needed to reproduce the workflow, rather than the raw audio dataset or generated experiment artifacts.
+
+## Web Application (Interactive Genre Classifier)
+
+A portfolio-quality interactive web application is located in the `website/` directory. It uses the existing trained Phase 5B RBF-SVM model and prediction pipeline.
+
+### Features
+
+- **Audio Upload:** Supports MP3, WAV, OGG, and FLAC, with audio metadata such as duration, sample rate, channels, and file size.
+- **Interactive 30-Second Waveform Editor:** Visualizes audio using Plotly, with a highlighted 30-second window synchronized with a start-time slider and numeric input fallback.
+- **Segment Audio Preview:** Provides an in-browser player for the selected segment before inference.
+- **Genre Classification:** Predicts one of the 16 FMA Medium genres using the Phase 5B RBF-SVM model with Mutual Information feature selection.
+- **Multi-Segment Comparison:** Analyzes multiple sections of a song to inspect differences between segment predictions.
+- **Visual Analytics:** Displays charts for genre distribution and a timeline of analyzed segments.
+- **Session History:** Keeps recent analyses across uploaded tracks within the session.
+- **Model Information:** Presents the dataset scope, feature schema, evaluation metrics, and limitations.
+
+### Running Locally
+
+Activate the Conda environment and launch Streamlit from the repository root:
+
+```powershell
+conda activate fml-music
+streamlit run website/app.py
+```
+
+Alternatively, use the explicit Python interpreter:
+
+```powershell
+& 'C:\Users\Nalla Avaneesh Reddy\anaconda3\envs\fml-music\python.exe' -m streamlit run website/app.py
+```
+
+### Model and Evaluation Metrics
+
+The web application uses the saved Phase 5B SVM model:
+
+`models/phase5b_svm/phase5b_svm__mutual_information.joblib`
+
+The model uses the Mutual Information feature representation, selecting 37 features from the 74-feature schema. The deployed model performs CPU inference and does not require a GPU or external prediction API.
+
+Reported evaluation results:
+
+| Experiment | Validation Macro-F1 | Test Macro-F1 |
+|---|---:|---:|
+| Phase 5: MI + PyTorch MLP | 0.3313 | 0.3280 |
+| Phase 5B: MI + RBF SVM | 0.3828 | 0.3150* |
+
+*The Phase 5B test score is exploratory because the Phase 5 test partition had already been examined before the Phase 5B follow-up experiment was designed. It should not be interpreted as an unbiased final performance estimate.*
+
+The web application does not provide calibrated confidence probabilities from the deployed SVM model.
+
+### Deployment to Streamlit Community Cloud
+
+The application is prepared for deployment to [Streamlit Community Cloud](https://share.streamlit.io/).
+
+- **Repository:** `Avaneesh1292/FML_Project`
+- **Branch:** `main`
+- **Main file path:** `website/app.py`
+- **Dependencies:** `website/requirements.txt`
+- **Model bundle:** `models/phase5b_svm/phase5b_svm__mutual_information.joblib`
+
+The required model bundle is approximately 5 MB and does not require Git LFS. The application runs audio decoding, feature extraction, and inference on the hosting server. It does not require the user's computer to have the model installed or a GPU.
+
+The deployment uses the free hosting tier, subject to Streamlit Community Cloud's resource limits and sleep behavior.
 
 ## Reproducibility
 
