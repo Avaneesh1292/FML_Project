@@ -11,8 +11,7 @@ html, body, [class*="css"] { font-family: Inter, -apple-system, BlinkMacSystemFo
 .block-container { max-width: 1040px; padding-top: 2rem; padding-bottom: 2.5rem; }
 .app-heading { padding: 1.5rem 0 1.1rem; border-bottom: 1px solid #2b2c32; margin-bottom: 1.7rem; }
 .app-kicker { color: #aaa7bd; font-size: .72rem; letter-spacing: .13em; font-weight: 650; }
-.app-heading h1 { margin: .45rem 0 .35rem; font-size: clamp(1.8rem, 4vw, 2.5rem); line-height: 1.14; color: #f2f1f5; font-weight: 650; }
-.app-heading p { color: #aaaab3; margin: 0; font-size: .98rem; }
+.app-heading h1 { margin: .45rem 0 0; font-size: clamp(1.8rem, 4vw, 2.5rem); line-height: 1.14; color: #f2f1f5; font-weight: 650; }
 .section-header { margin: 1.5rem 0 .75rem; padding-bottom: .55rem; border-bottom: 1px solid #292a30; }
 .section-header h2 { color: #e8e7ed; font-size: 1.1rem !important; font-weight: 600 !important; margin: 0 !important; }
 .glass-card, .glass-card-accent, .prediction-card, .eval-card { background: rgba(27, 28, 34, .82); border: 1px solid #34353d; border-radius: 13px; padding: 1rem 1.15rem; }
