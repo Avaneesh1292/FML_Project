@@ -10,7 +10,7 @@ To regenerate that export on the project workstation, use the configured `fml-mu
 & "$env:USERPROFILE\anaconda3\envs\fml-music\python.exe" website/export_mlp_checkpoint.py
 ```
 
-The exporter refuses to overwrite an existing export. It does not train or modify the source model. To launch locally:
+The exporter refuses to overwrite an existing export. It does not train or modify the source model. To launch locally, double-click `website/run_local.bat` from File Explorer. It explicitly uses the `fml-music` interpreter. Alternatively, from the repository root in PowerShell:
 
 ```powershell
 & "$env:USERPROFILE\anaconda3\envs\fml-music\python.exe" -m streamlit run website/app.py

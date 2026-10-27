@@ -188,7 +188,14 @@ def predict_feature_vector(features: dict[str, float], bundle: dict[str, Any]) -
         raw = model.predict_proba(values)[0]
         classes = getattr(model, "classes_", bundle["labels"])
         probabilities = {str(label): float(probability) for label, probability in zip(classes, raw)}
-    return {"genre": predicted, "probabilities": probabilities}
+    from src.prediction import decision_scores_for_model
+
+    decision_scores = decision_scores_for_model(model, values, bundle["labels"])
+    return {
+        "genre": predicted,
+        "probabilities": probabilities,
+        "decision_scores": decision_scores,
+    }
 
 
 def generate_waveform_data(

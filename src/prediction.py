@@ -135,6 +135,35 @@ def predict_audio(path: str | Path, bundle: dict[str, Any]) -> dict[str, Any]:
     return predict_features(features, bundle)
 
 
+def decision_scores_for_model(
+    model: Any, values: Any, fallback_labels: list[str] | tuple[str, ...]
+) -> dict[str, float] | None:
+    """Return per-class decision scores when the fitted model exposes them.
+
+    Pairwise one-vs-one scores cannot be assigned to individual classes, so
+    only a one-score-per-class output is accepted for this single-row use.
+    """
+    decision_function = getattr(model, "decision_function", None)
+    if not callable(decision_function):
+        return None
+
+    classes = getattr(model, "classes_", fallback_labels)
+    class_names = [str(label) for label in np.asarray(classes).tolist()]
+    raw = np.asarray(decision_function(values), dtype=np.float64)
+    if raw.ndim == 1 and raw.size == len(class_names):
+        row = raw
+    elif raw.ndim == 2 and raw.shape == (1, len(class_names)):
+        row = raw[0]
+    else:
+        raise ValueError(
+            "Model decision_function must return one score per class for one input; "
+            f"received shape {raw.shape} for {len(class_names)} classes"
+        )
+    if not np.isfinite(row).all():
+        raise ValueError("Model decision_function returned non-finite class scores")
+    return {label: float(score) for label, score in zip(class_names, row)}
+
+
 def predict_features(features: dict[str, float], bundle: dict[str, Any]) -> dict[str, Any]:
     """Run a validated predictor on one feature vector using its saved order."""
     if list(features) != FEATURE_COLUMNS:
@@ -152,5 +181,10 @@ def predict_features(features: dict[str, float], bundle: dict[str, Any]) -> dict
         raw = model.predict_proba(values)[0]
         classes = getattr(model, "classes_", bundle["labels"])
         probabilities = {str(label): float(probability) for label, probability in zip(classes, raw)}
-    return {"genre": predicted, "probabilities": probabilities}
+    decision_scores = decision_scores_for_model(model, values, bundle["labels"])
+    return {
+        "genre": predicted,
+        "probabilities": probabilities,
+        "decision_scores": decision_scores,
+    }
 
