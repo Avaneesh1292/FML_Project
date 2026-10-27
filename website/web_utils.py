@@ -161,6 +161,36 @@ def extract_segment_features(segment: np.ndarray, sr: int, audio_config: dict[st
             pass
 
 
+def predict_feature_vector(features: dict[str, float], bundle: dict[str, Any]) -> dict[str, Any]:
+    """Apply a saved inference bundle to a feature vector.
+
+    This web-local adapter keeps the deployed app compatible with checkouts
+    where ``src.prediction`` predates its optional ``predict_features`` helper.
+    The transformation and model calls match that shared helper exactly.
+    """
+    from src.feature_extraction import FEATURE_COLUMNS
+    import pandas as pd
+
+    if list(features) != FEATURE_COLUMNS:
+        missing = [name for name in FEATURE_COLUMNS if name not in features]
+        extra = [name for name in features if name not in FEATURE_COLUMNS]
+        raise ValueError(
+            f"Feature vector does not match the 74-feature schema (missing={missing}, extra={extra})"
+        )
+    frame = pd.DataFrame([[features[name] for name in FEATURE_COLUMNS]], columns=FEATURE_COLUMNS)
+    frame = frame.loc[:, bundle["selected_columns"]]
+    transformer = bundle.get("transformer")
+    values = transformer.transform(frame) if transformer is not None else frame
+    model = bundle["model"]
+    predicted = str(model.predict(values)[0])
+    probabilities = None
+    if hasattr(model, "predict_proba"):
+        raw = model.predict_proba(values)[0]
+        classes = getattr(model, "classes_", bundle["labels"])
+        probabilities = {str(label): float(probability) for label, probability in zip(classes, raw)}
+    return {"genre": predicted, "probabilities": probabilities}
+
+
 def generate_waveform_data(
     waveform: np.ndarray, sr: int, target_points: int = 2000
 ) -> tuple[np.ndarray, np.ndarray]:

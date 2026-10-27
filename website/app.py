@@ -20,7 +20,7 @@ sys.path.insert(0, str(_THIS_DIR))
 import numpy as np
 import streamlit as st
 
-from src.prediction import load_predictor, predict_features
+from src.prediction import load_predictor
 
 from streamlit_app.components import (
     create_genre_distribution_chart,
@@ -47,6 +47,7 @@ from web_utils import (
     generate_waveform_data,
     load_audio_from_upload,
     extract_segment_features,
+    predict_feature_vector as predict_features,
     segment_to_wav_bytes,
 )
 

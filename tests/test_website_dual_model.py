@@ -15,6 +15,7 @@ sys.path.insert(0, str(WEBSITE))
 from mlp_inference import load_mlp_predictor
 from src.feature_extraction import FEATURE_COLUMNS
 from src.prediction import load_predictor, predict_features
+from web_utils import predict_feature_vector
 
 
 class TestWebsiteDualModel(unittest.TestCase):
@@ -39,8 +40,10 @@ class TestWebsiteDualModel(unittest.TestCase):
         self.assertEqual(bundle["selected_columns"], mlp["selected_columns"])
         vector = {name: 0.0 for name in FEATURE_COLUMNS}
         result = predict_features(vector, bundle)
+        web_result = predict_feature_vector(vector, bundle)
         self.assertIn(result["genre"], bundle["labels"])
         self.assertIsNone(result["probabilities"])
+        self.assertEqual(web_result, result)
 
 
     def test_app_exposes_selector_and_compact_classification_controls(self):
