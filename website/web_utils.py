@@ -146,6 +146,21 @@ def predict_segment_genre(
             pass
 
 
+def extract_segment_features(segment: np.ndarray, sr: int, audio_config: dict[str, Any]) -> dict[str, float]:
+    """Extract the training-compatible 74-feature vector from a waveform segment."""
+    from src.feature_extraction import extract_feature_vector
+    fd, tmp_path = tempfile.mkstemp(suffix=".wav")
+    try:
+        os.close(fd)
+        sf.write(tmp_path, segment, sr, format="WAV", subtype="PCM_16")
+        return extract_feature_vector(tmp_path, audio_config)
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+
+
 def generate_waveform_data(
     waveform: np.ndarray, sr: int, target_points: int = 2000
 ) -> tuple[np.ndarray, np.ndarray]:

@@ -7,6 +7,7 @@ are pure-display helpers with **no** ML logic.
 from __future__ import annotations
 
 from collections import Counter
+from html import escape
 from typing import Any
 
 import numpy as np
@@ -19,17 +20,13 @@ from web_utils import format_duration, format_file_size
 # ── Hero ──────────────────────────────────────────────────────────────────────
 
 
-def render_hero() -> None:
+def render_page_header() -> None:
     st.markdown(
         """
-        <div class="hero-container">
-            <div class="hero-badge">FML Mini-Project &nbsp;·&nbsp; Machine Learning</div>
-            <div class="hero-title">Discover the Sound.<br>Predict the Genre.</div>
-            <div class="hero-subtitle">
-                Explore music through machine learning — upload a song,
-                select any 30-second segment, and let a trained SVM
-                classify its genre in real time.
-            </div>
+        <div class="app-heading">
+            <div class="app-kicker">FML MINI PROJECT · FMA MEDIUM</div>
+            <h1>Music Genre Classification</h1>
+            <p>Explore acoustic features and compare two machine learning approaches trained on FMA Medium.</p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -41,9 +38,7 @@ def render_hero() -> None:
 
 def render_section_header(icon: str, title: str) -> None:
     st.markdown(
-        f'<div class="section-header">'
-        f'<span class="section-icon">{icon}</span>'
-        f"<h2>{title}</h2></div>",
+        f'<div class="section-header"><h2>{escape(title)}</h2></div>',
         unsafe_allow_html=True,
     )
 
@@ -64,7 +59,7 @@ def render_audio_info(
         f"""
         <div class="glass-card">
             <div style="color:#c084fc;font-weight:700;font-size:1rem;margin-bottom:10px">
-                🎵&ensp;{filename}
+                {escape(filename)}
             </div>
             <div class="info-grid">
                 <div class="info-item">
@@ -186,11 +181,12 @@ def render_prediction_card(result: dict[str, Any]) -> None:
         <div class="prediction-card">
             <div style="font-size:0.82rem;color:#64748b;text-transform:uppercase;
                         letter-spacing:0.08em;font-weight:600">Predicted Genre</div>
-            <div class="genre-label">{result['genre']}</div>
+            <div class="genre-label">{escape(str(result['genre']))}</div>
             <div class="prediction-meta">
-                {result['filename']} &ensp;·&ensp;
+                {escape(str(result['filename']))} &ensp;·&ensp;
                 {format_duration(start)} – {format_duration(end)}
             </div>
+            <div class="prediction-model">Model: {escape(str(result.get('model_name', 'RBF-SVM')))}</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -225,6 +221,7 @@ def render_comparison_table(results: list[dict[str, Any]]) -> None:
             f"<td style='text-align:center'>#{r['segment_number']}</td>"
             f"<td>{format_duration(r['start'])} – {format_duration(r['end'])}</td>"
             f"<td style='color:#c084fc;font-weight:600'>{r['genre']}</td>"
+            f"<td>{escape(str(r.get('model_name', 'RBF-SVM')))}</td>"
             f"</tr>"
         )
     st.markdown(
@@ -234,6 +231,7 @@ def render_comparison_table(results: list[dict[str, Any]]) -> None:
                 <th style="text-align:center">Seg</th>
                 <th>Time Range</th>
                 <th>Predicted Genre</th>
+                <th>Model</th>
             </tr></thead>
             <tbody>{rows}</tbody>
         </table>
@@ -369,11 +367,11 @@ def render_model_info() -> None:
     st.markdown(
         """
         <div class="glass-card-accent">
-        <h3 style="margin-top:0 !important">🧠&ensp;Deployed Model</h3>
+        <h3 style="margin-top:0 !important">Classifiers</h3>
         <div class="info-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr))">
             <div class="info-item">
-                <div class="info-item-label">Model</div>
-                <div class="info-item-value">RBF-Kernel SVM</div>
+                <div class="info-item-label">Classifiers</div>
+                <div class="info-item-value">RBF-SVM and PyTorch MLP</div>
             </div>
             <div class="info-item">
                 <div class="info-item-label">Pipeline</div>
@@ -400,6 +398,7 @@ def render_model_info() -> None:
         """,
         unsafe_allow_html=True,
     )
+    st.caption("Both use 37 Mutual Information-selected features from the 74-feature schema. Each model applies its own saved training-fitted scaler.")
 
     # Evaluation metrics
     col1, col2 = st.columns(2)
@@ -440,7 +439,6 @@ def render_model_info() -> None:
     st.markdown(
         """
         <div class="eval-warning-note">
-            <span class="note-icon">⚠️</span>
             <div><strong>Evaluation note:</strong> The Phase 5B test score is exploratory because the Phase 5 test partition had already been examined before this experiment was designed. It should not be interpreted as an unbiased final performance estimate.</div>
         </div>
         """,
@@ -455,7 +453,7 @@ def render_about() -> None:
     st.markdown(
         """
         <div class="glass-card">
-        <h3 style="margin-top:0 !important">📖&ensp;About This Project</h3>
+        <h3 style="margin-top:0 !important">About This Project</h3>
         <p style="color:#94a3b8;line-height:1.7;font-size:0.92rem">
         This application is an academic <strong>FML (Foundations of Machine Learning)
         mini-project</strong> that explores automatic music genre classification.
@@ -489,7 +487,7 @@ def render_limitations() -> None:
     st.markdown(
         """
         <div class="glass-card">
-        <h3 style="margin-top:0 !important">⚠️&ensp;Limitations</h3>
+        <h3 style="margin-top:0 !important">Limitations</h3>
         <ul style="color:#94a3b8;line-height:1.8;font-size:0.9rem;padding-left:20px">
             <li>The model was trained on FMA Medium. Music outside this distribution
                 (different recording quality, genres not in the 16 classes, or

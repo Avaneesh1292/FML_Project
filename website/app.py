@@ -5,6 +5,7 @@ Launch with:  python -m streamlit run website/app.py
 from __future__ import annotations
 
 import sys
+import hashlib
 from datetime import datetime
 from pathlib import Path
 
@@ -19,7 +20,7 @@ sys.path.insert(0, str(_THIS_DIR))
 import numpy as np
 import streamlit as st
 
-from src.prediction import load_predictor
+from src.prediction import load_predictor, predict_features
 
 from streamlit_app.components import (
     create_genre_distribution_chart,
@@ -31,7 +32,7 @@ from streamlit_app.components import (
     render_comparison_table,
     render_footer,
     render_genre_list,
-    render_hero,
+    render_page_header,
     render_limitations,
     render_metric_card,
     render_model_info,
@@ -45,14 +46,13 @@ from web_utils import (
     format_duration,
     generate_waveform_data,
     load_audio_from_upload,
-    predict_segment_genre,
+    extract_segment_features,
     segment_to_wav_bytes,
 )
 
 # ── Page configuration ────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="Genre Classifier — FML Music Analysis",
-    page_icon="🎵",
+    page_title="Music Genre Classifier",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
@@ -61,6 +61,7 @@ inject_custom_css()
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 MODEL_PATH = _PROJECT_ROOT / "models" / "phase5b_svm" / "phase5b_svm__mutual_information.joblib"
+MLP_PATH = _THIS_DIR / "models" / "phase5_mutual_information_mlp_cpu.pt"
 SEGMENT_DURATION = 30.0  # seconds — fixed
 MAX_HISTORY = 50  # bounded session history
 
@@ -71,6 +72,12 @@ MAX_HISTORY = 50  # bounded session history
 def _load_model_bundle():
     """Load and validate the prediction bundle once, cached across reruns."""
     return load_predictor(MODEL_PATH)
+
+
+@st.cache_resource(show_spinner=False)
+def _load_mlp_bundle():
+    from mlp_inference import load_mlp_predictor
+    return load_mlp_predictor(MLP_PATH)
 
 
 try:
@@ -98,6 +105,9 @@ def _init_state() -> None:
         "audio_channels": 0,
         "audio_original_sr": 0,
         "uploaded_file_id": None,
+        "feature_cache_key": None,
+        "feature_cache": None,
+        "selected_model": "RBF-SVM",
         "segment_start": 0.0,
         "current_results": [],
         "analysis_counter": 0,
@@ -117,7 +127,7 @@ _init_state()
 #  HERO
 # ══════════════════════════════════════════════════════════════════════════════
 
-render_hero()
+render_page_header()
 
 if not _model_loaded:
     st.error(f"⚠️ Could not load the prediction model. {_model_error}")
@@ -127,7 +137,7 @@ if not _model_loaded:
 #  UPLOAD SECTION
 # ══════════════════════════════════════════════════════════════════════════════
 
-render_section_header("📁", "Upload Audio")
+render_section_header("", "Upload Audio")
 
 upload_key = f"uploader_{st.session_state.upload_key_counter}"
 uploaded_file = st.file_uploader(
@@ -139,7 +149,7 @@ uploaded_file = st.file_uploader(
 
 # Handle upload / clear
 if uploaded_file is not None:
-    file_id = f"{uploaded_file.name}__{uploaded_file.size}"
+    file_id = hashlib.sha256(uploaded_file.getvalue()).hexdigest()
 
     if file_id != st.session_state.uploaded_file_id:
         # ── New file: decode and reset analysis state ────────────────
@@ -160,10 +170,14 @@ if uploaded_file is not None:
                 st.session_state.current_results = []
                 st.session_state.analysis_counter = 0
                 st.session_state.last_prediction = None
+                st.session_state.feature_cache_key = None
+                st.session_state.feature_cache = None
             except Exception as exc:
                 st.error(f"Could not decode this audio file. {exc}")
                 st.session_state.audio_waveform = None
                 st.session_state.uploaded_file_id = None
+                st.session_state.feature_cache_key = None
+                st.session_state.feature_cache = None
 else:
     # File uploader is empty — clear audio state if something was loaded
     if st.session_state.audio_waveform is not None:
@@ -178,6 +192,8 @@ else:
         st.session_state.current_results = []
         st.session_state.last_prediction = None
         st.session_state.analysis_counter = 0
+        st.session_state.feature_cache_key = None
+        st.session_state.feature_cache = None
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -201,7 +217,7 @@ if st.session_state.audio_waveform is not None:
     )
 
     # ── Full-track audio player ──────────────────────────────────────
-    with st.expander("▶ Play full track", expanded=False):
+    with st.expander("Play full track", expanded=False):
         full_wav = segment_to_wav_bytes(waveform, sr)
         st.audio(full_wav, format="audio/wav")
 
@@ -217,7 +233,7 @@ if st.session_state.audio_waveform is not None:
         #  WAVEFORM & SEGMENT SELECTION
         # ══════════════════════════════════════════════════════════════
 
-        render_section_header("🎚️", "Select a 30-Second Segment")
+        render_section_header("", "Select a 30-Second Segment")
 
         max_start = duration - SEGMENT_DURATION
 
@@ -292,16 +308,31 @@ if st.session_state.audio_waveform is not None:
             #  ANALYZE BUTTON
             # ══════════════════════════════════════════════════════════
             st.markdown("<br>", unsafe_allow_html=True)
-            analyze_clicked = st.button(
-                "🎵  Analyze This Segment",
-                use_container_width=True,
-                type="primary",
-            )
+            with st.container(border=True):
+                selected_model = st.radio(
+                    "Classification model",
+                    options=["RBF-SVM", "PyTorch MLP"],
+                    horizontal=True,
+                    key="selected_model",
+                    help="Two classifiers with their own saved preprocessing.",
+                )
+                analyze_clicked = st.button(
+                    "Classify Genre",
+                    use_container_width=True,
+                    type="primary",
+                )
 
             if analyze_clicked:
-                with st.spinner("Extracting features and predicting genre…"):
+                with st.spinner("Preparing features and predicting genre…"):
                     try:
-                        result = predict_segment_genre(segment, sr, _bundle)
+                        active_bundle = _bundle if selected_model == "RBF-SVM" else _load_mlp_bundle()
+                        cache_key = f"{st.session_state.uploaded_file_id}:{start_sec:.3f}:{SEGMENT_DURATION:.1f}"
+                        if st.session_state.feature_cache_key != cache_key:
+                            st.session_state.feature_cache = extract_segment_features(
+                                segment, sr, active_bundle["audio_config"]
+                            )
+                            st.session_state.feature_cache_key = cache_key
+                        result = predict_features(st.session_state.feature_cache, active_bundle)
                         predicted_genre = result["genre"]
 
                         new_entry = {
@@ -310,6 +341,7 @@ if st.session_state.audio_waveform is not None:
                             "start": start_sec,
                             "end": end_sec,
                             "genre": predicted_genre,
+                            "model_name": selected_model,
                             "timestamp": datetime.now().isoformat(timespec="seconds"),
                         }
                         st.session_state.analysis_counter += 1
@@ -323,7 +355,7 @@ if st.session_state.audio_waveform is not None:
         # ══════════════════════════════════════════════════════════════
 
         if st.session_state.last_prediction:
-            render_section_header("🎯", "Prediction Result")
+            render_section_header("", "Prediction Result")
             render_prediction_card(st.session_state.last_prediction)
 
             # Segment audio for the latest result
@@ -333,7 +365,7 @@ if st.session_state.audio_waveform is not None:
                     waveform, sr, last["start"], SEGMENT_DURATION
                 )
                 res_wav = segment_to_wav_bytes(res_segment, sr)
-                with st.expander("▶ Listen to analyzed segment", expanded=False):
+                with st.expander("Listen to analyzed segment", expanded=False):
                     st.audio(res_wav, format="audio/wav")
             except Exception:
                 pass  # non-critical
@@ -344,7 +376,7 @@ if st.session_state.audio_waveform is not None:
 
         results = st.session_state.current_results
         if results:
-            render_section_header("📊", "Segment Comparison")
+            render_section_header("", "Segment Comparison")
 
             render_comparison_table(results)
 
@@ -359,7 +391,7 @@ if st.session_state.audio_waveform is not None:
                         index=len(seg_nums) - 1,
                         label_visibility="collapsed",
                     )
-                    if st.button("🗑 Remove selected", key="btn_remove"):
+                    if st.button("Remove selected", key="btn_remove"):
                         st.session_state.current_results = [
                             r for r in results if r["segment_number"] != remove_num
                         ]
@@ -375,13 +407,13 @@ if st.session_state.audio_waveform is not None:
                             )
                         st.rerun()
                 with col_clr:
-                    if st.button("🗑 Clear all", key="btn_clear_all"):
+                    if st.button("Clear all", key="btn_clear_all"):
                         st.session_state.current_results = []
                         st.session_state.last_prediction = None
                         st.session_state.analysis_counter = 0
                         st.rerun()
             elif len(results) == 1:
-                if st.button("🗑 Clear result", key="btn_clear_single"):
+                if st.button("Clear result", key="btn_clear_single"):
                     st.session_state.current_results = []
                     st.session_state.last_prediction = None
                     st.session_state.analysis_counter = 0
@@ -392,7 +424,7 @@ if st.session_state.audio_waveform is not None:
             # ══════════════════════════════════════════════════════════
 
             if len(results) >= 2:
-                render_section_header("📈", "Visual Analytics")
+                render_section_header("", "Visual Analytics")
 
                 st.caption(
                     "These charts show predictions for the segments you analysed "
@@ -425,20 +457,20 @@ if st.session_state.audio_waveform is not None:
 # ══════════════════════════════════════════════════════════════════════════════
 
 if st.session_state.session_history:
-    render_section_header("🕒", "Recent Session History")
-    st.caption("Previous analyses from earlier uploads in this session.")
-    render_comparison_table(st.session_state.session_history[:20])
-    if st.button("Clear session history", key="btn_clear_hist"):
-        st.session_state.session_history = []
-        st.rerun()
+    with st.expander("Recent session history", expanded=False):
+        st.caption("Previous analyses from earlier uploads in this session.")
+        render_comparison_table(st.session_state.session_history[:20])
+        if st.button("Clear session history", key="btn_clear_hist"):
+            st.session_state.session_history = []
+            st.rerun()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  MODEL INFORMATION & ABOUT
 # ══════════════════════════════════════════════════════════════════════════════
 
-render_section_header("🧠", "Model & Evaluation")
-render_model_info()
+with st.expander("Model details and evaluation", expanded=False):
+    render_model_info()
 
 if _genre_labels:
     st.markdown(
@@ -448,10 +480,10 @@ if _genre_labels:
     )
     render_genre_list(_genre_labels)
 
-render_section_header("📖", "About This Project")
-render_about()
+with st.expander("About this project", expanded=False):
+    render_about()
 
-render_section_header("⚠️", "Limitations")
-render_limitations()
+with st.expander("Limitations", expanded=False):
+    render_limitations()
 
 render_footer()

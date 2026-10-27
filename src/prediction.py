@@ -132,6 +132,15 @@ def load_predictor(path: str | Path) -> dict[str, Any]:
 
 def predict_audio(path: str | Path, bundle: dict[str, Any]) -> dict[str, Any]:
     features = extract_feature_vector(path, bundle["audio_config"])
+    return predict_features(features, bundle)
+
+
+def predict_features(features: dict[str, float], bundle: dict[str, Any]) -> dict[str, Any]:
+    """Run a validated predictor on one feature vector using its saved order."""
+    if list(features) != FEATURE_COLUMNS:
+        missing = [name for name in FEATURE_COLUMNS if name not in features]
+        extra = [name for name in features if name not in FEATURE_COLUMNS]
+        raise ValueError(f"Feature vector does not match the 74-feature schema (missing={missing}, extra={extra})")
     frame = pd.DataFrame([[features[name] for name in FEATURE_COLUMNS]], columns=FEATURE_COLUMNS)
     frame = frame.loc[:, bundle["selected_columns"]]
     transformer = bundle.get("transformer")
