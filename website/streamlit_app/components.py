@@ -26,7 +26,6 @@ def render_page_header() -> None:
         <div class="app-heading">
             <div class="app-kicker">FML MINI PROJECT · FMA MEDIUM</div>
             <h1>Music Genre Classification</h1>
-            <p>Explore acoustic features and compare two machine learning approaches trained on FMA Medium.</p>
         </div>
         """,
         unsafe_allow_html=True,
